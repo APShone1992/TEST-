@@ -579,6 +579,7 @@ body.dark .ws-item{background:var(--surface-3)}
   <div id="email-cnt" style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px"></div>
   <div class="tw"><table class="dt"><thead><tr>
     <th class="sort" data-col="ts">Date &amp; Time</th>
+    <th class="sort" data-col="emp">EMP No.</th>
     <th class="sort" data-col="sender_name">Name</th>
     <th>Email</th>
     <th class="sort" data-col="type">Type</th>
@@ -603,6 +604,7 @@ body.dark .ws-item{background:var(--surface-3)}
   <div id="ur-cnt" style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px"></div>
   <div class="tw"><table class="dt"><thead><tr>
     <th class="sort" data-col="ts">Date &amp; Time</th>
+    <th class="sort" data-col="emp">EMP No.</th>
     <th>Query</th>
     <th class="sort" data-col="type">Type</th>
     <th>Age</th>
@@ -657,6 +659,7 @@ body.dark .ws-item{background:var(--surface-3)}
     <div class="card">
       <div class="card-title"><svg class="icon" width="14" height="14"><use href="#i-13"/></svg> Add Email record</div>
       <div class="form-row"><label>Full name</label><input type="text" id="m-name" placeholder="e.g. John Doe"/></div>
+      <div class="form-row"><label>EMP number <span style="font-weight:400;text-transform:none">(optional)</span></label><input type="text" id="m-emp" maxlength="6" inputmode="numeric" placeholder="e.g. 123456"/></div>
       <div class="form-row"><label>Email address</label><input type="text" id="m-email" placeholder="e.g. jane.doe@example.com"/></div>
       <div class="form-row"><label>Type</label><select id="m-type"><option value="pay">Pay</option><option value="deduction">Deduction</option></select></div>
       <div class="form-row"><label>Query</label><textarea id="m-content" placeholder="What did they ask?"></textarea></div>
@@ -664,6 +667,7 @@ body.dark .ws-item{background:var(--surface-3)}
     </div>
     <div class="card">
       <div class="card-title"><svg class="icon" width="14" height="14"><use href="#i-10"/></svg> Add unresolved record</div>
+      <div class="form-row"><label>EMP number <span style="font-weight:400;text-transform:none">(optional)</span></label><input type="text" id="m-ur-emp" maxlength="6" inputmode="numeric" placeholder="e.g. 123456"/></div>
       <div class="form-row"><label>Query / phrase</label><textarea id="m-ur-query" placeholder="What did the bot fail to answer?"></textarea></div>
       <div class="form-row"><label>Reason</label><select id="m-ur-type"><option value="unanswered">Unanswered</option><option value="unhelpful">Marked unhelpful</option></select></div>
       <button class="btn btn-primary" id="m-add-ur"><svg class="icon" width="14" height="14"><use href="#i-4"/></svg> Save unresolved record</button>
@@ -950,6 +954,7 @@ create policy "pub delete" on kv_store for delete using (true);</code>
     <h3><svg class="icon" width="14" height="14"><use href="#i-9"/></svg> Quick-add Email record</h3>
     <p>Manually log a pay or deduction query from a member.</p>
     <div class="form-row"><label>Full name</label><input type="text" id="qm-name" placeholder="e.g. Jane Smith"/></div>
+    <div class="form-row"><label>EMP number <span style="font-weight:400;text-transform:none">(optional)</span></label><input type="text" id="qm-emp" maxlength="6" inputmode="numeric" placeholder="e.g. 123456"/></div>
     <div class="form-row"><label>Email</label><input type="text" id="qm-email" placeholder="e.g. jane.doe@example.com"/></div>
     <div class="form-row"><label>Type</label><select id="qm-type"><option value="pay">Pay</option><option value="deduction">Deduction</option></select></div>
     <div class="form-row"><label>Query</label><textarea id="qm-content" placeholder="What did they ask?"></textarea></div>
@@ -1549,7 +1554,7 @@ const EmailTbl={
     let o=[...this.data];
     if(this.type)o=o.filter(x=>x.type===this.type);
     if(this.status)o=o.filter(x=>(x.status||'pending')===this.status);
-    if(this.q){const q=this.q.toLowerCase();o=o.filter(x=>(x.sender_name||'').toLowerCase().includes(q)||(x.email||'').toLowerCase().includes(q)||(x.content||'').toLowerCase().includes(q));}
+    if(this.q){const q=this.q.toLowerCase();o=o.filter(x=>(x.sender_name||'').toLowerCase().includes(q)||(x.email||'').toLowerCase().includes(q)||(x.content||'').toLowerCase().includes(q)||(x.emp||'').toLowerCase().includes(q));}
     return o.sort((a,b)=>{const va=a[this.sortField]??'',vb=b[this.sortField]??'';return this.sortField==='ts'?(this.sortDir==='asc'?va-vb:vb-va):(this.sortDir==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va)));});
   },
   async load(){this.data=await fetchEmail();this.render();},
@@ -1558,11 +1563,11 @@ const EmailTbl={
     $('#email-cnt').textContent=plural(rows.length,'record')+(this.data.length!==rows.length?` (${this.data.length} total)`:'');
     $$('#panel-2 th.sort').forEach(th=>{th.classList.remove('asc','desc');if(th.dataset.col===this.sortField)th.classList.add(this.sortDir);});
     const body=$('#email-body');body.innerHTML='';
-    if(!rows.length){body.innerHTML=`<tr><td colspan="6"><div class="empty"><span class="empty-icon">📭</span><p>${this.data.length?'No records match your filter.':'No Email logs yet.'}</p></div></td></tr>`;return;}
+    if(!rows.length){body.innerHTML=`<tr><td colspan="8"><div class="empty"><span class="empty-icon">📭</span><p>${this.data.length?'No records match your filter.':'No Email logs yet.'}</p></div></td></tr>`;return;}
     rows.forEach(x=>{
       const tr=document.createElement('tr');
       const statusBadge=x.status==='resolved'?'<span class="badge badge-resolved">✓ resolved</span>':'<span class="badge badge-pending">pending</span>';
-      tr.innerHTML=`<td style="white-space:nowrap">${fmtDT(x.ts)}</td><td><strong>${esc(x.sender_name||'—')}</strong></td><td style="white-space:nowrap">${esc(x.email||'—')}</td><td>${badge(x.type)}</td><td class="clip" title="${esc(x.content)}">${esc(x.content||'—')}</td><td>${statusBadge}</td><td><div class="row-actions"></div></td>`;
+      tr.innerHTML=`<td style="white-space:nowrap">${fmtDT(x.ts)}</td><td>${x.emp?`<code style="font-size:12px;font-weight:700;color:var(--brand);background:var(--surface-3);padding:2px 7px;border-radius:5px">${esc(x.emp)}</code>`:'<span style="color:var(--text-muted)">—</span>'}</td><td><strong>${esc(x.sender_name||'—')}</strong></td><td style="white-space:nowrap">${esc(x.email||'—')}</td><td>${badge(x.type)}</td><td class="clip" title="${esc(x.content)}">${esc(x.content||'—')}</td><td>${statusBadge}</td><td><div class="row-actions"></div></td>`;
      const res=document.createElement('button');res.className='btn btn-green btn-sm';res.title='Mark resolved';res.textContent='✓ Resolved';
       res.addEventListener('click',async()=>{
         if(!SB.ready()){toast('⚠ Connect Supabase first');return;}
@@ -1589,7 +1594,7 @@ const EmailTbl={
     if(!SB.ready()){toast('⚠ Connect Supabase first');return;}
     await SB.delAll('email_log');logActivity('🗑️','Cleared all Email logs');await refreshAll();toast('All Email deleted');
   },
-  exportCSV(){dlCSV([['Date','Name','Email','Type','Query'],...this.fil().map(x=>[fmtDT(x.ts),x.sender_name||'',x.email||'',x.type||'',x.content||''])],`email_${new Date().toISOString().slice(0,10)}.csv`);toast('CSV downloaded ✓');},
+  exportCSV(){dlCSV([['Date','EMP','Name','Email','Type','Query'],...this.fil().map(x=>[fmtDT(x.ts),x.emp||'',x.sender_name||'',x.email||'',x.type||'',x.content||''])],`email_${new Date().toISOString().slice(0,10)}.csv`);toast('CSV downloaded ✓');},
   bind(){
     $('#email-q').addEventListener('input',debounce(e=>{this.q=e.target.value;this.render();}));
     $('#email-t').addEventListener('change',e=>{this.type=e.target.value;this.render();});
@@ -1609,7 +1614,7 @@ const URTbl={
     let o=[...this.data];
     if(this.type)o=o.filter(x=>x.type===this.type);
     if(this.status)o=o.filter(x=>(x.status||'pending')===this.status);
-    if(this.q){const q=this.q.toLowerCase();o=o.filter(x=>(x.query||'').toLowerCase().includes(q));}
+    if(this.q){const q=this.q.toLowerCase();o=o.filter(x=>(x.query||'').toLowerCase().includes(q)||(x.emp||'').toLowerCase().includes(q));}
     if(this.age==='hot')o=o.filter(x=>daysAgo(x.ts)>=7);
     else if(this.age==='warm')o=o.filter(x=>daysAgo(x.ts)>=3&&daysAgo(x.ts)<7);
     else if(this.age==='ok')o=o.filter(x=>daysAgo(x.ts)<3);
@@ -1623,11 +1628,18 @@ const URTbl={
     $('#ur-cnt').innerHTML=plural(rows.length,'record')+(this.data.length!==rows.length?` (${this.data.length} total)`:'')+
       (hotCount?` <span style="color:var(--red);font-weight:700;margin-left:8px">⚠ ${hotCount} overdue (7+ days)</span>`:'');
     const body=$('#ur-body');body.innerHTML='';
-    if(!rows.length){body.innerHTML=`<tr><td colspan="5"><div class="empty"><span class="empty-icon">${this.data.length?'&#x2315;':'&#x2713;'}</span><p>${this.data.length?'No records match your filter.':'No unresolved queries — great!'}</p></div></td></tr>`;return;}
+    if(!rows.length){body.innerHTML=`<tr><td colspan="7"><div class="empty"><span class="empty-icon">${this.data.length?'&#x2315;':'&#x2713;'}</span><p>${this.data.length?'No records match your filter.':'No unresolved queries — great!'}</p></div></td></tr>`;return;}
     rows.forEach(x=>{
       const tr=document.createElement('tr');
       if(daysAgo(x.ts)>=7)tr.style.background='#fff5f5';
-      tr.innerHTML=`<td style="white-space:nowrap">${fmtDT(x.ts)}</td><td class="clip" title="${esc(x.query)}">${esc(x.query||'—')}</td><td>${badge(x.type)}</td><td>${ageBadge(x.ts)}</td><td><div class="row-actions"></div></td>`;
+      const empCell=x.emp?`<code style="font-size:12px;font-weight:700;color:var(--brand);background:var(--surface-3);padding:2px 7px;border-radius:5px">${esc(x.emp)}</code>`:'<span style="color:var(--text-muted)">—</span>';
+      tr.innerHTML=`<td style="white-space:nowrap">${fmtDT(x.ts)}</td><td>${empCell}</td><td class="clip" title="${esc(x.query)}">${esc(x.query||'—')}</td><td>${badge(x.type)}</td><td>${ageBadge(x.ts)}</td><td class="ur-note-cell"></td><td><div class="row-actions"></div></td>`;
+      const existingNote=(_notesCache && _notesCache[String(x.id)]) || '';
+      const noteCell=tr.querySelector('.ur-note-cell');
+      if(existingNote){const noteDiv=document.createElement('div');noteDiv.className='ur-note';noteDiv.textContent=existingNote;noteCell.appendChild(noteDiv);}
+      const noteBtn=document.createElement('button');noteBtn.className='note-edit-btn';noteBtn.textContent=existingNote?'✎ Edit':'+ Add note';
+      noteBtn.addEventListener('click',()=>openNoteModal(x.id, existingNote));
+      noteCell.appendChild(noteBtn);
       const res=document.createElement('button');res.className='btn btn-green btn-sm';res.title='Mark resolved';res.textContent='✓ Resolved';
       res.addEventListener('click',async()=>{
         if(!SB.ready()){toast('⚠ Connect Supabase first');return;}
@@ -1654,7 +1666,7 @@ const URTbl={
     if(!SB.ready()){toast('⚠ Connect Supabase first');return;}
     await SB.delAll('unresolved');logActivity('🗑️','Cleared all unresolved logs');await refreshAll();toast('All unresolved deleted');
   },
-  exportCSV(){dlCSV([['Date','Query','Type','Days Old'],...this.fil().map(x=>[fmtDT(x.ts),x.query||'',x.type||'',daysAgo(x.ts)])],`unresolved_${new Date().toISOString().slice(0,10)}.csv`);toast('CSV downloaded ✓');},
+  exportCSV(){dlCSV([['Date','EMP','Query','Type','Days Old'],...this.fil().map(x=>[fmtDT(x.ts),x.emp||'',x.query||'',x.type||'',daysAgo(x.ts)])],`unresolved_${new Date().toISOString().slice(0,10)}.csv`);toast('CSV downloaded ✓');},
   bind(){
     $('#ur-q').addEventListener('input',debounce(e=>{this.q=e.target.value;this.render();}));
     $('#ur-t').addEventListener('change',e=>{this.type=e.target.value;this.render();});
@@ -1670,19 +1682,19 @@ const URTbl={
 ══════════════════════════════════════════ */
 function bindManage(){
   $('#m-add-email').addEventListener('click',async()=>{
-    const sender=val('#m-name'),email=val('#m-email'),type=$('#m-type').value,content=val('#m-content');
+    const sender=val('#m-name'),emp=val('#m-emp').replace(/\D/g,''),email=val('#m-email'),type=$('#m-type').value,content=val('#m-content');
     if(!sender||!content){toast('⚠ Name and query are required');return;}
     if(!SB.ready()){toast('⚠ Connect Supabase in Setup first');return;}
-    await SB.insert('email_log',{ts:Date.now(),sender_name:sender,email,type,content});
-    ['#m-name','#m-email','#m-content'].forEach(id=>{const e=$(id);if(e)e.value='';});
+    await SB.insert('email_log',{ts:Date.now(),sender_name:sender,email,type,content,emp});
+    ['#m-name','#m-emp','#m-email','#m-content'].forEach(id=>{const e=$(id);if(e)e.value='';});
     await refreshAll();toast('Email record added ✓');
   });
   $('#m-add-ur').addEventListener('click',async()=>{
-    const query=val('#m-ur-query'),type=$('#m-ur-type').value;
+    const emp=val('#m-ur-emp').replace(/\D/g,''),query=val('#m-ur-query'),type=$('#m-ur-type').value;
     if(!query){toast('⚠ Query text is required');return;}
     if(!SB.ready()){toast('⚠ Connect Supabase in Setup first');return;}
-    await SB.insert('unresolved',{ts:Date.now(),query,type});
-    $('#m-ur-query').value='';
+    await SB.insert('unresolved',{ts:Date.now(),query,type,emp});
+    ['#m-ur-emp','#m-ur-query'].forEach(id=>{const e=$(id);if(e)e.value='';});
     await refreshAll();toast('Unresolved record added ✓');
   });
   $('#mg-clear-email').addEventListener('click',()=>EmailTbl.clearAll());
@@ -1697,11 +1709,11 @@ function bindModal(){
   $('#qm-cancel').addEventListener('click',()=>$('#modal-email').classList.add('hidden'));
   $('#modal-email').addEventListener('click',async e=>{if(e.target===$('#modal-email'))$('#modal-email').classList.add('hidden');});
   $('#qm-save').addEventListener('click',async()=>{
-    const sender=val('#qm-name'),email=val('#qm-email'),type=$('#qm-type').value,content=val('#qm-content');
+    const sender=val('#qm-name'),emp=val('#qm-emp').replace(/\D/g,''),email=val('#qm-email'),type=$('#qm-type').value,content=val('#qm-content');
     if(!sender||!content){toast('⚠ Name and query are required');return;}
     if(!SB.ready()){toast('⚠ Connect Supabase in Setup first');return;}
-    await SB.insert('email_log',{ts:Date.now(),sender_name:sender,email,type,content});
-    ['#qm-name','#qm-email','#qm-content'].forEach(id=>{const e=$(id);if(e)e.value='';});
+    await SB.insert('email_log',{ts:Date.now(),sender_name:sender,email,type,content,emp});
+    ['#qm-name','#qm-emp','#qm-email','#qm-content'].forEach(id=>{const e=$(id);if(e)e.value='';});
     $('#modal-email').classList.add('hidden');
     await refreshAll();toast('Email record added ✓');
   });
@@ -2256,7 +2268,8 @@ function runGlobalSearch(q) {
     (x.emp||'').includes(ql)
   ).slice(0, 5);
   const urHits = _searchCache.ur.filter(x =>
-    (x.query||'').toLowerCase().includes(ql)
+    (x.query||'').toLowerCase().includes(ql) ||
+    (x.emp||'').includes(ql)
   ).slice(0, 5);
   const empHits = _searchCache.emp.filter(x =>
     (x.emp||'').includes(ql) ||
