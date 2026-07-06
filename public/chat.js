@@ -801,7 +801,7 @@ function specialCases(text) {
     return { html: `No problem — here are some alternative options:<br><br>` +
       `📧 <b>Email welfare:</b><a href="mailto:welfareandsupportteam@kelly.co.uk">welfareandsupportteam@kelly.co.uk</a><br> Or Start a pay/deduction query above and I'll prepare an email for you.<br>` +
       ` <b>Or contact your Area Manager to escalate</b>`
-      `<b><b>`
+      `<br><br>`
       `🚨 <b>Urgent out-of-hours:</b><br>` +
       `<b>Fleet (OOH):</b> <a href="tel:07940766377">07940766377</a><br>` +
       `<b>Accident / Injury:</b> <a href="tel:07940792355">07940792355</a>`,
