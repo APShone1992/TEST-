@@ -734,7 +734,7 @@ function specialCases(text) {
     }
   }
 
-  // ── Active email collection flow ──
+// ── Active email collection flow ──
   if (emailCtx) {
     if (q === "cancel" || q === "stop" || q === "restart") { emailCtx = null; return { html: "No problem — that's been cancelled." }; }
     if (emailCtx.stage === "awaitingConfirm") {
@@ -752,8 +752,8 @@ function specialCases(text) {
       const _savedNorm = (emailCtx.savedEmail || "").trim().toLowerCase();
       const _qNorm = text.trim().toLowerCase();
       if (q.startsWith("use ") && _savedNorm && _qNorm === `use ${_savedNorm}`) {
-        emailCtx.email = emailCtx.savedEmail; storeEmail(emailCtx.email); emailCtx.stage = "needType";
-        return { html: "Is this a <b>Pay</b> or <b>Deduction</b> query?", chips: ["Pay query","Deduction query"] };
+        emailCtx.email = emailCtx.savedEmail; storeEmail(emailCtx.email); emailCtx.stage = "needPhone";
+        return { html: "Thanks. What's the best <b>phone number</b> to reach you on?" };
       }
       // They want a different address
       emailCtx.stage = "needEmail"; emailCtx.savedEmail = null;
@@ -763,7 +763,18 @@ function specialCases(text) {
       // Basic email validation
       const addr = text.trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) return { html: "That doesn't look like a valid email address — please enter your email again (e.g. name@example.com):" };
-      emailCtx.email = addr; storeEmail(emailCtx.email); emailCtx.stage = "needType";
+      emailCtx.email = addr; storeEmail(emailCtx.email); emailCtx.stage = "needPhone";
+      return { html: "Thanks. What's the best <b>phone number</b> to reach you on?" };
+    }
+    if (emailCtx.stage === "needPhone") {
+      // Basic phone validation — require at least 7 digits, allow spaces/+/-/()
+      const rawPhone = text.trim();
+      const digitsOnly = rawPhone.replace(/[^\d]/g, "");
+      if (!/^[\d\s()+-]+$/.test(rawPhone) || digitsOnly.length < 7 || digitsOnly.length > 15) {
+        return { html: "That doesn't look like a valid phone number — please enter a contact number (e.g. 07123 456789):" };
+      }
+      emailCtx.phone = rawPhone;
+      emailCtx.stage = "needType";
       return { html: "Is this a <b>Pay</b> or <b>Deduction</b> query?", chips: ["Pay query","Deduction query"] };
     }
     if (emailCtx.stage === "needType") { emailCtx.type = text.trim(); emailCtx.stage = "needDescription"; return { html: `Please briefly describe your query in 1–3 sentences: <small style="color:var(--text-muted,#8a94a8)">(max ${SETTINGS.emailMaxChars} characters)</small>` }; }
@@ -772,17 +783,18 @@ function specialCases(text) {
       if (text.trim().length > SETTINGS.emailMaxChars) { return { html: `That's a bit long — please keep it under <b>${SETTINGS.emailMaxChars} characters</b>. You currently have <b>${text.trim().length}</b>. Please shorten it and send again.` }; }
       emailCtx.description = trimmedDesc;
       const subject = encodeURIComponent(`Welfare Support Query — ${emailCtx.type}`);
-      const body = encodeURIComponent(`Welfare Support Query\nEMP: ${empNumber||"N/A"}\nName: ${emailCtx.name}\nEmail: ${emailCtx.email}\nType: ${emailCtx.type}\nQuery: ${emailCtx.description}`);
+      const body = encodeURIComponent(`Welfare Support Query\nEMP: ${empNumber||"N/A"}\nName: ${emailCtx.name}\nEmail: ${emailCtx.email}\nPhone: ${emailCtx.phone}\nType: ${emailCtx.type}\nQuery: ${emailCtx.description}`);
       const href = `mailto:${SETTINGS.emailTarget}?subject=${subject}&body=${body}`;
       const html = `<b>Ready to send</b><br>` +
         `EMP: <b>${escapeHTML(empNumber||"N/A")}</b><br>` +
         `Name: <b>${escapeHTML(emailCtx.name)}</b><br>` +
         `Email: <b>${escapeHTML(emailCtx.email)}</b><br>` +
+        `Phone: <b>${escapeHTML(emailCtx.phone)}</b><br>` +
         `Type: <b>${escapeHTML(emailCtx.type)}</b><br>` +
         `Query: <b>${escapeHTML(emailCtx.description)}</b><br><br>` +
         `<a href="${escapeAttrUrl(href)}" target="_blank" rel="noopener">📧 Tap here to send your email to ${escapeHTML(SETTINGS.emailTarget)}</a><br>` +
         `<small>Opens your email app with the message pre-filled and ready to send.</small>`;
-      logEmail({ name: emailCtx.name, email: emailCtx.email, type: emailCtx.type, description: emailCtx.description });
+      logEmail({ name: emailCtx.name, email: emailCtx.email, phone: emailCtx.phone, type: emailCtx.type, description: emailCtx.description });
       logIntent("email_sent"); emailCtx = { stage: "awaitingConfirm" };
       return { html, chips: ["Yes — sent ✓","No — try again"], _intent: "email_sent" };
     }
