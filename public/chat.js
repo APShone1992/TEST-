@@ -28,7 +28,7 @@ const SETTINGS = {
   minConfidence:      0.20,
   chipLimit:          8,
   chipClickCooldownMs:900,
-  emailTarget:        "Jonathan.A.Strugnell@kelly.co.uk",
+  emailTarget:        "welfareandsupportteam@kelly.co.uk",
   emailMaxChars:       1000,
 };
 
