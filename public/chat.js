@@ -1221,26 +1221,58 @@ async function lookupEMP(emp) {
       if (rows && rows.length && rows[0].value) {
         list = JSON.parse(rows[0].value);
         fetchedFromSupabase = true;
-        // Cache locally so it works if Supabase is temporarily down
-        try { localStorage.setItem('kv:' + EMP_LIST_KEY, rows[0].value); } catch {}
+        try { localStorage.setItem('kv:' + EMP_LIST_KEY, rows[0].value); } catch (e) {
+          console.warn('[lookupEMP] failed to cache list locally:', e);
+        }
+      } else {
+        console.warn('[lookupEMP] Supabase returned no row for key', EMP_LIST_KEY, rows);
       }
+    } else {
+      console.error('[lookupEMP] Supabase fetch failed:', resp.status, await resp.text());
     }
-  } catch {}
+  } catch (e) {
+    console.error('[lookupEMP] Supabase fetch threw:', e);
+  }
 
   // ── Step 2: Fall back to localStorage cache (set by admin or above) ────
   if (!list) {
     try {
       const raw = localStorage.getItem('kv:' + EMP_LIST_KEY) || localStorage.getItem(EMP_LIST_KEY);
-      if (raw) list = JSON.parse(raw);
-    } catch {}
+      if (raw) {
+        list = JSON.parse(raw);
+        console.warn('[lookupEMP] using localStorage fallback list');
+      }
+    } catch (e) {
+      console.error('[lookupEMP] localStorage parse failed:', e);
+    }
   }
 
   // ── Step 3: Decide ──────────────────────────────────────────────────────
-  // If we genuinely have no list anywhere — no list has been uploaded yet
-  if (!list) return { valid: true, name: null, dept: null, listLoaded: false };
+  if (!list) {
+    console.warn('[lookupEMP] no list found anywhere — open access mode');
+    return { valid: true, name: null, dept: null, listLoaded: false };
+  }
 
-  const rec = list[emp];
-  if (rec === undefined) return { valid: false, name: null, dept: null, listLoaded: true };
+  // Normalize: accept either an object keyed by EMP number,
+  // or an array of records ({emp,name,dept} / {EMP,Name,Dept} / similar).
+  let rec;
+  if (Array.isArray(list)) {
+    console.warn('[lookupEMP] list is an ARRAY, not an object — normalizing on the fly');
+    const found = list.find(r => {
+      const candidate = r?.emp ?? r?.EMP ?? r?.empNumber ?? r?.id;
+      return String(candidate).trim() === String(emp).trim();
+    });
+    rec = found
+      ? { name: found.name ?? found.Name ?? null, dept: found.dept ?? found.Dept ?? null }
+      : undefined;
+  } else {
+    rec = list[emp];
+  }
+
+  if (rec === undefined) {
+    console.warn('[lookupEMP] EMP not found in list:', emp, 'list size:', Array.isArray(list) ? list.length : Object.keys(list).length);
+    return { valid: false, name: null, dept: null, listLoaded: true };
+  }
 
   const name = typeof rec === 'object' ? rec.name : rec;
   const dept = typeof rec === 'object' ? rec.dept : null;
